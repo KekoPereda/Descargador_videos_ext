@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Descargador YouTube</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1><img src="icons/icono_keko.png" alt="" class="logo">Descargador YouTube</h1>
+    <button id="encendido" class="encendido" title="Encender o apagar el servidor local">
+      <span id="servidor" class="servidor">●</span>
+      <span id="texto-encendido">Comprobando...</span>
+    </button>
+  </header>
+
+  <label for="url">Dirección del video</label>
+  <div class="fila">
+    <input id="url" type="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off">
+    <button id="pegar" class="secundario" title="Pegar desde el portapapeles">Pegar</button>
+  </div>
+
+  <p class="pregunta">¿Qué quieres descargar?</p>
+  <div class="opciones">
+    <label class="opcion">
+      <input type="radio" name="tipo" value="audio" checked>
+      <span class="tarjeta">
+        <span class="icono">🎵</span>
+        <span class="titulo">Audio</span>
+        <span class="detalle">MP3</span>
+      </span>
+    </label>
+    <label class="opcion">
+      <input type="radio" name="tipo" value="video">
+      <span class="tarjeta">
+        <span class="icono">🎬</span>
+        <span class="titulo">Video</span>
+        <span class="detalle">MP4</span>
+      </span>
+    </label>
+  </div>
+
+  <div id="bloque-calidad" class="oculto">
+    <label for="calidad">Calidad del video</label>
+    <select id="calidad">
+      <option value="mejor">La mejor disponible</option>
+      <option value="1080">Hasta 1080p</option>
+      <option value="720">Hasta 720p</option>
+      <option value="480">Hasta 480p</option>
+    </select>
+  </div>
+
+  <button id="descargar" class="principal">Descargar</button>
+
+  <div id="estado" class="estado oculto">
+    <div class="barra"><div id="progreso" class="progreso"></div></div>
+    <p id="mensaje"></p>
+    <button id="mostrar" class="secundario mostrar oculto">📁 Mostrar en Finder</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

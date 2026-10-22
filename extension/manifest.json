@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Descargador YouTube",
+  "version": "1.0.0",
+  "description": "Descarga audio (MP3) o video (MP4) de YouTube mediante un servidor local con yt-dlp.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Descargar de YouTube",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp8YB2mqszFguYB+cwlGxHXOhrkRa1okRVdtxnIuv8QHkuhPAidnjA2LUF6HZzkER2JsQ15N9MvVaLpZi7miAGT2HcHDBGra7zusH8CY4I5W+iZIDFerOFiywzeoDcwAauKLGvJ3/bFzDa2M+z8TfY81Itt1IH3k5snbA/ChzgAGOTK04Ho74z/4JhgySgRCyI13WrCNVQ5TfFc0qQS5Ta8qRVQ1iQJsjvD6/q8mS4TCwOmqUC1cSsQifjC/IGSJ5eRUduMeG312YvEYSNQtKCOeHd3xg5l4S+O4yf6KCaw5/OyFiLdrDj3O2VM7k2CYCS+i00HKN/3vMLWiOTr5z0wIDAQAB",
+  "permissions": ["activeTab", "storage", "nativeMessaging"],
+  "host_permissions": ["http://127.0.0.1:8765/*"]
+}
