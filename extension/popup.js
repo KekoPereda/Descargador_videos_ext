@@ -13,8 +13,15 @@ const botonEncendido = $("encendido");
 const textoEncendido = $("texto-encendido");
 const ANFITRION = "com.descargador.youtube";
 const botonMostrar = $("mostrar");
+const ayuda = $("ayuda");
 
 let intervalo = null;
+// Se ajusta al iniciar según el sistema (Mac o Windows).
+let esWindows = false;
+const instalador = () => (esWindows ? "servidor/instalar.bat" : "servidor/instalar.command");
+const archivoRegistro = () =>
+  esWindows ? "%LOCALAPPDATA%\\DescargadorYouTube\\DescargadorYouTube.log" : "~/Library/Logs/DescargadorYouTube.log";
+const terminal = () => (esWindows ? "PowerShell" : "la Terminal");
 
 function esUrlYoutube(texto) {
   try {
@@ -36,10 +43,52 @@ function mostrarEstado(texto, porcentaje = null, clase = "") {
   if (porcentaje !== null) progreso.style.width = porcentaje + "%";
 }
 
+// Muestra qué programas faltan en el equipo y el comando para instalarlos.
+function mostrarAyuda(datos) {
+  const faltan = [];
+  if (!datos.ytdlp) faltan.push(["yt-dlp", "Obligatorio: es el que descarga los videos.", datos.instalar?.ytdlp]);
+  if (!datos.ffmpeg) faltan.push(["ffmpeg", "Recomendado: sin él no hay MP3 y el video queda en baja calidad.", datos.instalar?.ffmpeg]);
+  ayuda.replaceChildren();
+  ayuda.classList.toggle("oculto", faltan.length === 0);
+  if (!faltan.length) return;
+
+  const titulo = document.createElement("p");
+  titulo.textContent = `⚠️ Falta instalar en este equipo (abre ${terminal()} y ejecuta):`;
+  ayuda.append(titulo);
+  for (const [nombre, explicacion, comando] of faltan) {
+    const bloque = document.createElement("div");
+    bloque.className = "faltante";
+    const texto = document.createElement("strong");
+    texto.textContent = nombre + ": ";
+    bloque.append(texto, explicacion);
+    if (comando) {
+      const fila = document.createElement("div");
+      fila.className = "comando";
+      const codigo = document.createElement("code");
+      codigo.textContent = comando;
+      const copiar = document.createElement("button");
+      copiar.className = "secundario";
+      copiar.textContent = "Copiar";
+      copiar.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(comando);
+        copiar.textContent = "¡Copiado!";
+      });
+      fila.append(codigo, copiar);
+      bloque.append(fila);
+    }
+    ayuda.append(bloque);
+  }
+  const nota = document.createElement("p");
+  nota.className = "nota";
+  nota.textContent = `Después de instalar, pulsa Apagar y luego Encender. También puedes ejecutar ${instalador()}, que revisa todo.`;
+  ayuda.append(nota);
+}
+
 async function comprobarServidor() {
   try {
     const r = await fetch(SERVIDOR + "/salud");
     const datos = await r.json();
+    mostrarAyuda(datos);
     indicador.className = "servidor ok";
     textoEncendido.textContent = "Apagar";
     botonEncendido.title = "Servidor activo" + (datos.ffmpeg ? "" : " (sin ffmpeg: calidad limitada)") + ". Clic para apagar.";
@@ -62,7 +111,7 @@ async function encenderServidor() {
     const noInstalado = /not found|no encontrado/i.test(e.message);
     mostrarEstado(
       noInstalado
-        ? "No se pudo encender: falta registrar el anfitrión. Ejecuta servidor/instalar.command una vez y recarga la extensión."
+        ? `No se pudo encender: falta instalar la parte local. Haz doble clic en ${instalador()} una vez y recarga la extensión.`
         : "No se pudo encender el servidor: " + e.message,
       null, "fallo"
     );
@@ -73,7 +122,7 @@ async function encenderServidor() {
     if (await comprobarServidor()) return true;
     await esperar(250);
   }
-  mostrarEstado("El servidor no respondió. Revisa ~/Library/Logs/DescargadorYouTube.log", null, "fallo");
+  mostrarEstado(`El servidor no respondió. Revisa ${archivoRegistro()}`, null, "fallo");
   return false;
 }
 
@@ -190,13 +239,16 @@ async function mostrarEnFinder() {
     });
     if (!r.ok) throw new Error((await r.json()).error || "Error desconocido");
   } catch (e) {
-    mostrarEstado("❌ No se pudo abrir Finder: " + e.message, null, "fallo");
+    mostrarEstado("❌ No se pudo abrir la carpeta: " + e.message, null, "fallo");
   } finally {
     botonMostrar.disabled = false;
   }
 }
 
 async function iniciar() {
+  esWindows = (await chrome.runtime.getPlatformInfo()).os === "win";
+  if (esWindows) botonMostrar.textContent = "📁 Mostrar en el Explorador";
+
   // Preferencias guardadas
   const { tipo, calidad, trabajo, ultimo } = await chrome.storage.local.get(["tipo", "calidad", "trabajo", "ultimo"]);
   if (tipo) document.querySelector(`input[name="tipo"][value="${tipo}"]`).checked = true;
@@ -211,7 +263,7 @@ async function iniciar() {
   if (activo && trabajo) {
     seguirTrabajo(trabajo);
   } else if (ultimo) {
-    // Recordar la última descarga para poder abrirla en Finder al volver a abrir el popup.
+    // Recordar la última descarga para poder abrirla en la carpeta al volver a abrir el popup.
     mostrarEstado(`Última descarga: ${ultimo.archivo || "(sin nombre)"}`, 100, "listo");
     botonMostrar.classList.remove("oculto");
   }

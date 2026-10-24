@@ -95,4 +95,26 @@ button:disabled { opacity: .6; cursor: default; }
 .progreso.fallo { background: #d93025; width: 100% !important; }
 #mensaje { margin: 8px 0 0; color: #444; word-break: break-word; white-space: pre-line; }
 
+.ayuda {
+  margin-bottom: 14px;
+  padding: 10px;
+  border: 1px solid #f2c94c;
+  border-radius: 6px;
+  background: #fff8e1;
+  font-size: 12px;
+}
+.ayuda p { margin: 0 0 6px; }
+.ayuda .faltante { margin-top: 8px; }
+.ayuda .comando { display: flex; gap: 6px; margin-top: 4px; }
+.ayuda code {
+  flex: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: #fff;
+  border: 1px solid #e0d6b0;
+  font-size: 11px;
+  word-break: break-all;
+}
+.ayuda .nota { margin: 8px 0 0; color: #666; }
+
 .oculto { display: none; }

@@ -14,7 +14,12 @@ import sys
 
 DIRECTORIO = os.path.dirname(os.path.abspath(__file__))
 SERVIDOR = os.path.join(DIRECTORIO, "servidor.py")
-REGISTRO = os.path.expanduser("~/Library/Logs/DescargadorYouTube.log")
+WINDOWS = sys.platform == "win32"
+if WINDOWS:
+    REGISTRO = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")),
+                            "DescargadorYouTube", "DescargadorYouTube.log")
+else:
+    REGISTRO = os.path.expanduser("~/Library/Logs/DescargadorYouTube.log")
 PUERTO = 8765
 
 
@@ -44,23 +49,43 @@ def encender():
     if servidor_activo():
         return {"ok": True, "mensaje": "El servidor ya estaba encendido"}
 
-    # Chrome lanza este proceso con un PATH mínimo: se añaden las rutas de Homebrew
-    # para que el servidor encuentre yt-dlp y ffmpeg.
     entorno = dict(os.environ)
-    entorno["PATH"] = "/opt/homebrew/bin:/usr/local/bin:" + entorno.get("PATH", "/usr/bin:/bin")
+    # El registro se escribe en UTF-8 aunque Windows use otra codificación por defecto.
+    entorno["PYTHONIOENCODING"] = "utf-8"
+    if WINDOWS:
+        # winget deja aquí los accesos a yt-dlp y ffmpeg; así se encuentran aunque
+        # se hayan instalado después de abrir Chrome.
+        extra = [os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "WinGet", "Links")]
+    else:
+        # Chrome lanza este proceso con un PATH mínimo: se añaden las rutas de Homebrew
+        # para que el servidor encuentre yt-dlp y ffmpeg.
+        extra = ["/opt/homebrew/bin", "/usr/local/bin"]
+    entorno["PATH"] = os.pathsep.join(extra + [entorno.get("PATH", os.defpath)])
 
     os.makedirs(os.path.dirname(REGISTRO), exist_ok=True)
     with open(REGISTRO, "a") as registro:
-        # Sesión nueva para que el servidor siga vivo cuando Chrome cierre este anfitrión.
-        subprocess.Popen(
-            [sys.executable, SERVIDOR, "--puerto", str(PUERTO)],
-            cwd=DIRECTORIO,
-            env=entorno,
-            stdin=subprocess.DEVNULL,
-            stdout=registro,
-            stderr=registro,
-            start_new_session=True,
-        )
+        def lanzar(**opciones):
+            subprocess.Popen(
+                [sys.executable, SERVIDOR, "--puerto", str(PUERTO)],
+                cwd=DIRECTORIO,
+                env=entorno,
+                stdin=subprocess.DEVNULL,
+                stdout=registro,
+                stderr=registro,
+                **opciones,
+            )
+
+        if not WINDOWS:
+            # Sesión nueva para que el servidor siga vivo cuando Chrome cierre este anfitrión.
+            lanzar(start_new_session=True)
+        else:
+            # Chrome mete al anfitrión en un "job" que cierra a sus hijos al terminar:
+            # el servidor sale de ese job, sin ventana de consola.
+            flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+            try:
+                lanzar(creationflags=flags | subprocess.CREATE_BREAKAWAY_FROM_JOB)
+            except OSError:
+                lanzar(creationflags=flags)
     return {"ok": True, "mensaje": "Servidor iniciado"}
 
 

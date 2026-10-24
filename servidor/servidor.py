@@ -29,6 +29,12 @@ trabajos = {}
 bloqueo = threading.Lock()
 CARPETA = os.path.expanduser("~/Downloads/YouTube")
 
+WINDOWS = sys.platform == "win32"
+if WINDOWS:
+    INSTALAR_YTDLP, INSTALAR_FFMPEG = "winget install yt-dlp.yt-dlp", "winget install Gyan.FFmpeg"
+else:
+    INSTALAR_YTDLP, INSTALAR_FFMPEG = "brew install yt-dlp", "brew install ffmpeg"
+
 
 def comando_ytdlp():
     ruta = shutil.which("yt-dlp")
@@ -73,8 +79,10 @@ def construir_argumentos(url, tipo, calidad):
         altura = CALIDADES.get(calidad)
         filtro = "[height<=%d]" % altura if altura else ""
         if ffmpeg:
+            # Se prefiere H.264 (avc1): QuickTime/Vista Previa no reproducen AV1 ni VP9.
             args += [
-                "-f", "bv*%s[ext=mp4]+ba[ext=m4a]/bv*%s+ba/b%s" % (filtro, filtro, filtro),
+                "-f", "bv*%s[vcodec^=avc1]+ba[ext=m4a]/bv*%s[ext=mp4]+ba[ext=m4a]/bv*%s+ba/b%s"
+                % (filtro, filtro, filtro, filtro),
                 "--merge-output-format", "mp4",
             ]
         else:
@@ -82,6 +90,17 @@ def construir_argumentos(url, tipo, calidad):
             args += ["-f", "b%s[ext=mp4]/b%s" % (filtro, filtro)]
 
     return args + ["--", url]
+
+
+def abrir_en_carpeta(ruta, seleccionar):
+    """Abre Finder o el Explorador de Windows; con seleccionar=True marca el archivo."""
+    if WINDOWS:
+        if seleccionar:
+            subprocess.run(["explorer", "/select,", os.path.normpath(ruta)], check=False)
+        else:
+            os.startfile(ruta)
+    else:
+        subprocess.run(["/usr/bin/open"] + (["-R"] if seleccionar else []) + [ruta], check=False)
 
 
 def ejecutar(id_trabajo, url, tipo, calidad):
@@ -95,8 +114,11 @@ def ejecutar(id_trabajo, url, tipo, calidad):
             construir_argumentos(url, tipo, calidad),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True,
+            # En Windows la codificación por defecto no es UTF-8: un título raro no debe romper la lectura.
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
+            creationflags=subprocess.CREATE_NO_WINDOW if WINDOWS else 0,
         )
         ultimas = []
         for linea in proceso.stdout:
@@ -158,7 +180,8 @@ class Manejador(BaseHTTPRequestHandler):
             return self.responder(403, {"error": "Origen no permitido"})
         if self.path == "/salud":
             return self.responder(200, {"ok": True, "ytdlp": comando_ytdlp() is not None,
-                                        "ffmpeg": hay_ffmpeg(), "carpeta": CARPETA})
+                                        "ffmpeg": hay_ffmpeg(), "carpeta": CARPETA,
+                                        "instalar": {"ytdlp": INSTALAR_YTDLP, "ffmpeg": INSTALAR_FFMPEG}})
         if self.path.startswith("/estado/"):
             id_trabajo = self.path[len("/estado/"):]
             with bloqueo:
@@ -186,7 +209,7 @@ class Manejador(BaseHTTPRequestHandler):
             return self.responder(400, {"error": "JSON inválido"})
 
         if self.path == "/mostrar":
-            return self.mostrar_en_finder(datos.get("id"))
+            return self.mostrar_en_carpeta(datos.get("id"))
 
         url = str(datos.get("url", "")).strip()
         tipo = datos.get("tipo")
@@ -199,7 +222,7 @@ class Manejador(BaseHTTPRequestHandler):
         if calidad not in CALIDADES:
             calidad = "mejor"
         if comando_ytdlp() is None:
-            return self.responder(500, {"error": "yt-dlp no está instalado (brew install yt-dlp)"})
+            return self.responder(500, {"error": "yt-dlp no está instalado (%s)" % INSTALAR_YTDLP})
 
         id_trabajo = uuid.uuid4().hex
         with bloqueo:
@@ -210,17 +233,17 @@ class Manejador(BaseHTTPRequestHandler):
         threading.Thread(target=ejecutar, args=(id_trabajo, url, tipo, calidad), daemon=True).start()
         self.responder(202, {"id": id_trabajo})
 
-    def mostrar_en_finder(self, id_trabajo):
+    def mostrar_en_carpeta(self, id_trabajo):
         # Solo se abren rutas que el propio servidor descargó, nunca una ruta enviada por el cliente.
         with bloqueo:
             t = trabajos.get(id_trabajo) if isinstance(id_trabajo, str) else None
             ruta = t.get("ruta") if t else None
         os.makedirs(CARPETA, exist_ok=True)
         if ruta and os.path.exists(ruta):
-            subprocess.run(["/usr/bin/open", "-R", ruta], check=False)
+            abrir_en_carpeta(ruta, seleccionar=True)
             return self.responder(200, {"ok": True, "ruta": ruta})
         # Si el archivo ya no existe (o el servidor se reinició), se abre la carpeta de descargas.
-        subprocess.run(["/usr/bin/open", CARPETA], check=False)
+        abrir_en_carpeta(CARPETA, seleccionar=False)
         self.responder(200, {"ok": True, "ruta": CARPETA})
 
     def log_message(self, formato, *args):
@@ -236,9 +259,9 @@ def main():
     CARPETA = os.path.expanduser(opciones.carpeta)
 
     if comando_ytdlp() is None:
-        print("⚠️  yt-dlp no encontrado. Instálalo con:  brew install yt-dlp")
+        print("⚠️  yt-dlp no encontrado. Instálalo con:  " + INSTALAR_YTDLP)
     if not hay_ffmpeg():
-        print("⚠️  ffmpeg no encontrado: no habrá MP3 ni video en alta calidad. Instálalo con:  brew install ffmpeg")
+        print("⚠️  ffmpeg no encontrado: no habrá MP3 ni video en alta calidad. Instálalo con:  " + INSTALAR_FFMPEG)
 
     servidor = ThreadingHTTPServer(("127.0.0.1", opciones.puerto), Manejador)
     print("✅ Servidor escuchando en http://127.0.0.1:%d" % opciones.puerto)
